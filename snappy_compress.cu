@@ -619,13 +619,15 @@ void setup_compression(struct host_buffer_context *input, struct host_buffer_con
 	 * This last factor dominates the blowup, so the final estimate is:
 	 */
 	uint32_t max_compressed_length = snappy_max_compressed_length(input->length);
-	output->buffer = (uint8_t *)malloc(sizeof(uint8_t) * max_compressed_length);
+	if (! runtime->reuse_buffers)
+		output->buffer = (uint8_t *)malloc(sizeof(uint8_t) * max_compressed_length);
 	output->curr = output->buffer;
 	output->length = 0;
 
 	gettimeofday(&end, NULL);
 	runtime->pre = get_runtime(&start, &end);
 }
+
 void setup_compression_cuda(struct host_buffer_context *input, struct host_buffer_context *output, struct program_runtime *runtime) 
 {
 	struct timeval start;
@@ -655,14 +657,36 @@ void setup_compression_cuda(struct host_buffer_context *input, struct host_buffe
 	 * This last factor dominates the blowup, so the final estimate is:
 	 */
 	uint32_t max_compressed_length = snappy_max_compressed_length(input->length);
-	//output->buffer = (uint8_t *)malloc(sizeof(uint8_t) * max_compressed_length);
 	output->total_size = sizeof(uint8_t) * max_compressed_length;
-	checkCudaErrors(cudaMallocManaged(&output->buffer,output->total_size));
+	if (! runtime->reuse_buffers)
+		checkCudaErrors(cudaMallocManaged(&output->buffer,output->total_size));
 	output->curr = output->buffer;
 	output->length = 0;
 
 	gettimeofday(&end, NULL);
 	runtime->pre = get_runtime(&start, &end);
+}
+
+void terminate_compression(struct host_buffer_context *input, struct host_buffer_context *output, struct program_runtime *runtime)
+{
+	if (runtime->using_cuda) {
+		// Release memory allocated by setup_compression_cuda()
+		checkCudaErrors(cudaFree(output->buffer));
+
+		// Release memory allocated by snappy_compress_cuda()
+		compression_aux_t *aux = &input->compression_aux;
+		checkCudaErrors(cudaFree(aux->input_block_size_array));
+		checkCudaErrors(cudaFree(aux->output_offsets));
+		for (int i = 0; i < aux->total_blocks; i++)
+			checkCudaErrors(cudaFree(aux->table[i]));
+		checkCudaErrors(cudaFree(aux->table));
+	} else {
+		// Release memory allocated by setup_compression()
+		free(output->buffer);
+	}
+
+	output->buffer = NULL;
+	runtime->reuse_buffers = false;
 }
 
 snappy_status snappy_compress_host(struct host_buffer_context *input, struct host_buffer_context *output, uint32_t block_size)
@@ -715,21 +739,30 @@ snappy_status snappy_compress_cuda(struct host_buffer_context *input, struct hos
     if(last_block_size)
         ++total_blocks;
 
-    uint32_t *input_block_size_array = NULL;
-	checkCudaErrors(cudaMallocManaged(&input_block_size_array,sizeof(uint32_t) * total_blocks));
+	compression_aux_t *aux = &input->compression_aux;
+	if (! runtime->reuse_buffers) {
+		checkCudaErrors(cudaMallocManaged(&aux->input_block_size_array,sizeof(uint32_t) * total_blocks));
+		checkCudaErrors(cudaMallocManaged(&aux->output_offsets,sizeof(uint32_t) * total_blocks));
+		checkCudaErrors(cudaMallocManaged(&aux->table, sizeof(uint16_t *) * total_blocks));
+		for(int i = 0; i < total_blocks; i++)
+			checkCudaErrors(cudaMallocManaged(&aux->table[i], sizeof(uint16_t) * MAX_HASH_TABLE_SIZE));
+		aux->total_blocks = total_blocks;
+	} else if (aux->total_blocks < total_blocks) {
+		fprintf(stderr, "%s: existing buffers are too small to be reused\n", __func__);
+		return SNAPPY_BUFFER_TOO_SMALL;
+	}
+
+	uint32_t *input_block_size_array = aux->input_block_size_array;
     for(int i = 0 ; i < total_blocks; i++)
         input_block_size_array[i] = block_size;
     if(last_block_size)
         input_block_size_array[total_blocks-1] = last_block_size;
 
-	uint32_t *output_offsets;		//this will hold the end of each output portion for easy later merging
-	checkCudaErrors(cudaMallocManaged(&output_offsets,sizeof(uint32_t) * total_blocks));
+	//this will hold the end of each output portion for easy later merging
+	uint32_t *output_offsets = input->compression_aux.output_offsets;
 
-
-	uint16_t **table;
-	checkCudaErrors(cudaMallocManaged(&table, sizeof(uint16_t *) * total_blocks));
-	for(int i = 0; i < total_blocks; i++)
-		checkCudaErrors(cudaMallocManaged(&table[i], sizeof(uint16_t) * MAX_HASH_TABLE_SIZE));
+	//hash table for compression
+	uint16_t **table = input->compression_aux.table;
 
 	//CUDA calculation for grid and threads per block
 	dim3 block(1);
@@ -749,9 +782,9 @@ snappy_status snappy_compress_cuda(struct host_buffer_context *input, struct hos
 	}
 	
 
-	printf("---\nTotal blocks = %d\n", total_blocks);
-	printf("block_size_array[last_block] = %d\n", input_block_size_array[total_blocks - 1]);
-	printf("grid.x = %d , block.x = %d\n---\n", grid.x, block.x);
+	//printf("---\nTotal blocks = %d\n", total_blocks);
+	//printf("block_size_array[last_block] = %d\n", input_block_size_array[total_blocks - 1]);
+	//printf("grid.x = %d , block.x = %d\n---\n", grid.x, block.x);
 
 	int device = -1;
   	cudaGetDevice(&device);
@@ -764,8 +797,6 @@ snappy_status snappy_compress_cuda(struct host_buffer_context *input, struct hos
 	output->length += output_metadata_size;
 	for(int i = 0; i < total_blocks; i++)
 		output->length += output_offsets[i];
-
-
 
 	// The first part of the output is the metadata (output_metadata_size bytes)
 	// Every cuda thread will work on a block_size (32K) block independantly and write to its output block (also 32K)
@@ -780,12 +811,6 @@ snappy_status snappy_compress_cuda(struct host_buffer_context *input, struct hos
 		
 		length_so_far += output_offsets[i];
 	}
-
-    checkCudaErrors(cudaFree(input_block_size_array));
-	checkCudaErrors(cudaFree(output_offsets));
-	for(int i = 0; i < total_blocks; i++)
-		checkCudaErrors(cudaFree(table[i]));
-	checkCudaErrors(cudaFree(table));
 
 	return SNAPPY_OK;
 }

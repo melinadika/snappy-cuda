@@ -32,6 +32,20 @@ enum element_type
 	EL_TYPE_COPY_4
 };
 
+// Auxiliary data needed by the compression and decompression codes.
+typedef struct compression_aux_t {
+	uint32_t *input_block_size_array;
+	uint32_t *output_offsets;
+	uint16_t **table;
+	uint32_t total_blocks;
+} compression_aux_t;
+
+typedef struct decompression_aux_t {
+	uint8_t **input_currents;
+	uint32_t *input_offsets;
+	uint32_t total_blocks;
+} decompression_aux_t;
+
 // Buffer context struct for input and output buffers on host
 typedef struct host_buffer_context
 {
@@ -40,8 +54,10 @@ typedef struct host_buffer_context
 	uint8_t *curr;			// Pointer to current location in buffer
 	unsigned long length;		// Length of buffer
 	unsigned long max;		// Maximum allowed lenght of buffer
-	uint32_t block_size;		//32K default. This is used in cuda code
-	uint32_t total_size;		//total allocated size, used for cudamemprefetchasynch
+	uint32_t block_size;		// 32K default. This is used in CUDA code
+	uint32_t total_size;		// total allocated size, used for cudamemprefetchasynch
+	compression_aux_t compression_aux;
+	decompression_aux_t decompression_aux;
 } host_buffer_context;
 
 // Breakdown of time spent doing each action
@@ -55,6 +71,8 @@ struct program_runtime {
 	double d_free;
 	int blocks;
 	int threads_per_block;
+	bool reuse_buffers;
+	bool using_cuda;
 };
 
 /**

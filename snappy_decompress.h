@@ -25,6 +25,14 @@ snappy_status setup_decompression(struct host_buffer_context *input, struct host
  */
 snappy_status setup_decompression_cuda(struct host_buffer_context *input, struct host_buffer_context *output, struct program_runtime *runtime);
 
+/**
+ * Releases memory buffers allocated for decompression on the host and device.
+ * 
+ * @param input: holds input buffer information
+ * @param output: holds output buffer information
+ * @param runtime: struct holding break down of runtimes for different parts of the program
+ */
+void terminate_decompression(struct host_buffer_context *input, struct host_buffer_context *output, struct program_runtime *runtime);
 
 /**
  * Perform the Snappy decompression on the host.

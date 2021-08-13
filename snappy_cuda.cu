@@ -140,7 +140,6 @@ int main(int argc, char **argv)
 	int opt;
 	snappy_status status;
 	
-	int use_cuda = 0;
 	int compress = 0;
 	int block_size = 32 * 1024; // Default is 32KB
     char * input_file = NULL;
@@ -150,15 +149,15 @@ int main(int argc, char **argv)
 	struct host_buffer_context *output;
 	struct program_runtime runtime;
 
-	runtime.blocks = runtime.threads_per_block = 0; //user didn't set values so use defaults which are set later
-
+	// use defaults which are set later
+	memset(&runtime, 0, sizeof(runtime));
 
 	while ((opt = getopt(argc, argv, options)) != -1)
 	{
 		switch(opt)
 		{
 		case 'd':
-			use_cuda = 1;
+			runtime.using_cuda = true;
 			break;
 
 		case 'c':
@@ -191,7 +190,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if(use_cuda)
+	if(runtime.using_cuda)
 	{
 		checkCudaErrors(cudaMallocManaged(&input,sizeof(host_buffer_context)));
 		checkCudaErrors(cudaMallocManaged(&output,sizeof(host_buffer_context)));
@@ -229,7 +228,7 @@ int main(int argc, char **argv)
 
 	// Read the input file into main memory
 
-	if(use_cuda) {
+	if(runtime.using_cuda) {
 		if (read_input_cuda(input_file, input))
 			return -1;
 		input->block_size = block_size;
@@ -242,7 +241,7 @@ int main(int argc, char **argv)
 	
 	if (compress) {
 		
-		if (use_cuda)
+		if (runtime.using_cuda)
 		{
 			setup_compression_cuda(input, output, &runtime);
 
@@ -272,7 +271,7 @@ int main(int argc, char **argv)
 	}
 	else {
 	
-		if (use_cuda)
+		if (runtime.using_cuda)
 		{
 			if (setup_decompression_cuda(input, output, &runtime))
 				return -1;
@@ -305,16 +304,18 @@ int main(int argc, char **argv)
 	if (status == SNAPPY_OK)
 	{
 		// Write the output buffer from main memory to a file
-		//if (!(compress && use_cuda))
+		//if (!(compress && runtime.using_cuda))
 			write_output_host(output_file, output);
 
 		if (compress) {
 			printf("Compressed %ld bytes to: %s\n", output->length, output_file);
 			printf("Compression ratio: %f\n", 1 - (double)output->length / (double)input->length);
+			terminate_compression(input, output, &runtime);
 		}
 		else {
 			printf("Decompressed %ld bytes to: %s\n", output->length, output_file);
 			printf("Compression ratio: %f\n", 1 - (double)input->length / (double)output->length);
+			terminate_decompression(input, output, &runtime);
 		}
 	
 		printf("Pre-processing time: %f\n", runtime.pre);
@@ -331,7 +332,7 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	if(use_cuda)
+	if(runtime.using_cuda)
 	{
 		checkCudaErrors(cudaFree(input));
 		checkCudaErrors(cudaFree(output));

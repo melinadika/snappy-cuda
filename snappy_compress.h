@@ -28,6 +28,15 @@ void setup_compression(struct host_buffer_context *input, struct host_buffer_con
 void setup_compression_cuda(struct host_buffer_context *input, struct host_buffer_context *output, struct program_runtime *runtime);
 
 /**
+ * Releases memory buffers allocated for compression on the host and device.
+ * 
+ * @param input: holds input buffer information
+ * @param output: holds output buffer information
+ * @param runtime: struct holding break down of runtimes for different parts of the program
+ */
+void terminate_compression(struct host_buffer_context *input, struct host_buffer_context *output, struct program_runtime *runtime);
+
+/**
  * Perform the Snappy compression on the host.
  *
  * @param input: holds input buffer information

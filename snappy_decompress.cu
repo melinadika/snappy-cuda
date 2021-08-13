@@ -274,8 +274,10 @@ snappy_status setup_decompression(struct host_buffer_context *input, struct host
 
 	// Allocate output buffer
     //printf("dlength, aligned, aligned | bitmasked %d %d %d\n",dlength, ALIGN(dlength,8), ALIGN(dlength, 8) | BITMASK(11));
-	output->buffer = (uint8_t *)malloc(ALIGN(dlength, 8) | BITMASK(11));
-	//output->buffer = (uint8_t *)malloc(ALIGN(dlength, 8));
+	if (! runtime->reuse_buffers) {
+		output->buffer = (uint8_t *)malloc(ALIGN(dlength, 8) | BITMASK(11));
+		//output->buffer = (uint8_t *)malloc(ALIGN(dlength, 8));
+	}
 	output->curr = output->buffer;
 	output->length = dlength;
 
@@ -308,7 +310,8 @@ snappy_status setup_decompression_cuda(struct host_buffer_context *input, struct
 	// Allocate output buffer
     //printf("dlength, aligned, aligned | bitmasked %d %d %d\n",dlength, ALIGN(dlength,8), ALIGN(dlength, 8) | BITMASK(11));
 	//output->buffer = (uint8_t *)malloc(ALIGN(dlength, 8) | BITMASK(11));
-	checkCudaErrors(cudaMallocManaged(&output->buffer, ALIGN(dlength, 8) | BITMASK(11)));
+	if (! runtime->reuse_buffers)
+		checkCudaErrors(cudaMallocManaged(&output->buffer, ALIGN(dlength, 8) | BITMASK(11)));
 
 	output->curr = output->buffer;
 	output->length = dlength;
@@ -317,6 +320,25 @@ snappy_status setup_decompression_cuda(struct host_buffer_context *input, struct
 	runtime->pre = get_runtime(&start, &end);
 
 	return SNAPPY_OK;
+}
+
+void terminate_decompression(struct host_buffer_context *input, struct host_buffer_context *output, struct program_runtime *runtime)
+{
+	if (runtime->using_cuda) {
+		// Release memory allocated by setup_decompression_cuda()
+		checkCudaErrors(cudaFree(output->buffer));
+
+		// Release memory allocated by snappy_decompress_cuda()
+		decompression_aux_t *aux = &input->decompression_aux;
+		checkCudaErrors(cudaFree(aux->input_offsets));
+		checkCudaErrors(cudaFree(aux->input_currents));
+	} else {
+		// Release memory allocated by setup_decompression()
+		free(output->buffer);
+	}
+
+	output->buffer = NULL;
+	runtime->reuse_buffers = false;
 }
 
 snappy_status snappy_decompress_host(struct host_buffer_context *input, struct host_buffer_context *output)
@@ -440,15 +462,22 @@ snappy_status snappy_decompress_cuda(struct host_buffer_context *input, struct h
 	}
 	
 
-	printf("---\nTotal blocks = %d\n", total_blocks);
-	printf("grid.x = %d , block.x = %d\n---\n", grid.x, block.x);
+	//printf("---\nTotal blocks = %d\n", total_blocks);
+	//printf("grid.x = %d , block.x = %d\n---\n", grid.x, block.x);
 
 	//calculate int input offset for each GPU thread. Since compressed blocks blocks are not distanced equally
 	//we have to get the starting location of each block.
-	uint8_t **input_currents;
-	uint32_t *input_offsets;
-	checkCudaErrors(cudaMallocManaged(&input_currents, sizeof(uint8_t *) * total_blocks));
-	checkCudaErrors(cudaMallocManaged(&input_offsets, sizeof(uint32_t) * total_blocks));
+	decompression_aux_t *aux = &input->decompression_aux;
+	if (runtime->reuse_buffers && aux->total_blocks < total_blocks) {
+		fprintf(stderr, "cache is not large enough to hold new data\n");
+		return SNAPPY_BUFFER_TOO_SMALL;
+	} else if (! runtime->reuse_buffers) {
+		checkCudaErrors(cudaMallocManaged(&(aux->input_currents), sizeof(uint8_t *) * total_blocks));
+		checkCudaErrors(cudaMallocManaged(&(aux->input_offsets), sizeof(uint32_t) * total_blocks));
+		aux->total_blocks = total_blocks;
+	}
+	uint8_t **input_currents = aux->input_currents;
+	uint32_t *input_offsets = aux->input_offsets;
 
 	int i = 0;
 	while (input->curr < (input->buffer + input->length)) {
@@ -467,12 +496,8 @@ snappy_status snappy_decompress_cuda(struct host_buffer_context *input, struct h
 	cudaMemPrefetchAsync(input_offsets,sizeof(uint32_t) * total_blocks , device, NULL);
 	cudaMemPrefetchAsync(input->buffer, input->total_size, device, NULL);
 
-
 	snappy_decompress_kernel<<<grid,block,0>>>(input, output, total_blocks, dblock_size, input_offsets, input_currents);
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	checkCudaErrors(cudaFree(input_offsets));
-	checkCudaErrors(cudaFree(input_currents));
-	
 	return SNAPPY_OK;
 }	
