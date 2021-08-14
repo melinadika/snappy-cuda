@@ -1,27 +1,52 @@
+# CUDA toolchain path
 CUDA_DIR = /usr/local/cuda
-
 CUDA_LIB_DIR := $(CUDA_DIR)/lib64
-CUDA_ARCH_FLAGS := -arch=sm_75
-#CC_FLAGS += $(CUDA_ARCH_FLAGS) -I. -g -G -Xptxas -dlcm=cg
-CC_FLAGS += $(CUDA_ARCH_FLAGS) -I. -O3
-#CC_FLAGS += $(CUDA_ARCH_FLAGS) -I.
-
 CC := $(CUDA_DIR)/bin/nvcc
 
-OBJ = snappy_cuda.o snappy_compress.o snappy_decompress.o
+# Target install directory
+DESTDIR = /usr/local
 
+# Build flags
+CUDA_ARCH_FLAGS := -arch=sm_75
+#CC_FLAGS += $(CUDA_ARCH_FLAGS) -I. -g -G -Xptxas -dlcm=cg
+CC_FLAGS += $(CUDA_ARCH_FLAGS) -I. -O3 -Xcompiler -fPIC
+LD_FLAGS := -Xcompiler -fPIC -shared
+IOFILTER_CFLAGS := $(shell pkg-config --cflags hdf5)
+IOFILTER_LDFLAGS := $(shell pkg-config --libs hdf5)
+
+LIB_OBJ = snappy_compress.o snappy_decompress.o
+MAIN_OBJ = $(LIB_OBJ) snappy_cuda.o
+IOFILTER_OBJ = snappy_iofilter.o
+
+# Main targets. We don't build the HDF5 I/O filter by default.
 all: snappy_cuda
 
-snappy_cuda : $(OBJ)
-	$(CC) $(OBJ) $(CC_FLAGS) -o $@
+iofilter: libsnappy_cuda_iofilter.so
+
+snappy_cuda : $(MAIN_OBJ)
+	$(CC) $^ $(CUDA_ARCH_FLAGS) -o $@
 	./gen_cscope.sh
-	
+
+libsnappy_cuda_iofilter.so: $(IOFILTER_OBJ) $(LIB_OBJ)
+	$(CC) $^ $(CUDA_ARCH_FLAGS) $(IOFILTER_LDFLAGS) $(LD_FLAGS) -o $@
+
 snappy_cuda.o: snappy_cuda.cu snappy_cuda.h
 	$(CC) -c  $< $(CC_FLAGS)
 snappy_compress.o: snappy_compress.cu snappy_compress.h
 	$(CC) -c  $< $(CC_FLAGS)
 snappy_decompress.o: snappy_decompress.cu snappy_decompress.h
 	$(CC) -c  $< $(CC_FLAGS)
+snappy_iofilter.o: snappy_iofilter.cu snappy_iofilter.h
+	$(CC) -c  $< $(CC_FLAGS) $(IOFILTER_CFLAGS)
+
+install:
+	@install -v -d $(DESTDIR)/bin $(DESTDIR)/include/snappy-cuda
+	@install -v snappy_cuda $(DESTDIR)/bin
+	@install -v *.h $(DESTDIR)/include/snappy-cuda
+	@if [ -e libsnappy_cuda_iofilter.so ]; then \
+		install -v -d $(DESTDIR)/hdf5/lib/plugin; \
+		install -v libsnappy_cuda_iofilter.so $(DESTDIR)/hdf5/lib/plugin; \
+	fi
 
 clean: 
-	rm -f snappy_cuda *.o
+	rm -f snappy_cuda libsnappy_cuda_iofilter.so *.o
