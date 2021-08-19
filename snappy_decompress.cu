@@ -468,10 +468,10 @@ snappy_status snappy_decompress_cuda(struct host_buffer_context *input, struct h
 	//calculate int input offset for each GPU thread. Since compressed blocks blocks are not distanced equally
 	//we have to get the starting location of each block.
 	decompression_aux_t *aux = &input->decompression_aux;
-	if (runtime->reuse_buffers && aux->total_blocks < total_blocks) {
+	if (runtime->reuse_buffers && aux->total_blocks && aux->total_blocks < total_blocks) {
 		fprintf(stderr, "cache is not large enough to hold new data\n");
 		return SNAPPY_BUFFER_TOO_SMALL;
-	} else if (! runtime->reuse_buffers) {
+	} else if (! runtime->reuse_buffers || aux->total_blocks == 0) {
 		checkCudaErrors(cudaMallocManaged(&(aux->input_currents), sizeof(uint8_t *) * total_blocks));
 		checkCudaErrors(cudaMallocManaged(&(aux->input_offsets), sizeof(uint32_t) * total_blocks));
 		aux->total_blocks = total_blocks;
