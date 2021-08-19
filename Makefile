@@ -8,12 +8,12 @@ DESTDIR = /usr/local
 
 # Build flags
 CUDA_ARCH_FLAGS := \
-       -arch=sm_60 \
-       -gencode=arch=compute_60,code=sm_60 \
-       -gencode=arch=compute_61,code=sm_61 \
-       -gencode=arch=compute_70,code=sm_70 \
-       -gencode=arch=compute_75,code=sm_75 \
-       -gencode=arch=compute_75,code=compute_75
+    -arch=sm_60 \
+    -gencode=arch=compute_60,code=sm_60 \
+    -gencode=arch=compute_61,code=sm_61 \
+    -gencode=arch=compute_70,code=sm_70 \
+    -gencode=arch=compute_75,code=sm_75 \
+    -gencode=arch=compute_75,code=compute_75
 CC_FLAGS += $(CUDA_ARCH_FLAGS) -I. -O3 -Xcompiler -fPIC
 LD_FLAGS := -Xcompiler -fPIC -shared
 IOFILTER_CFLAGS := $(shell pkg-config --cflags hdf5)
@@ -22,16 +22,18 @@ IOFILTER_LDFLAGS := $(shell pkg-config --libs hdf5)
 LIB_OBJ = snappy_compress.o snappy_decompress.o
 MAIN_OBJ = $(LIB_OBJ) snappy_cuda.o
 IOFILTER_OBJ = snappy_iofilter.o
+LIBUDF_READER_OBJ = gds_interface.o
 
-# Main targets. We don't build the HDF5 I/O filter by default.
-all: snappy_cuda
-
-iofilter: libsnappy_cuda_iofilter.so
+# Main targets
+all: snappy_cuda libsnappy_cuda_iofilter.so libudf_snappy_reader.so
 
 snappy_cuda : $(MAIN_OBJ)
 	$(CC) $^ $(CUDA_ARCH_FLAGS) -o $@
 
 libsnappy_cuda_iofilter.so: $(IOFILTER_OBJ) $(LIB_OBJ)
+	$(CC) $^ $(CUDA_ARCH_FLAGS) $(IOFILTER_LDFLAGS) $(LD_FLAGS) -o $@
+
+libudf_snappy_reader.so: $(LIBUDF_READER_OBJ) $(LIB_OBJ)
 	$(CC) $^ $(CUDA_ARCH_FLAGS) $(IOFILTER_LDFLAGS) $(LD_FLAGS) -o $@
 
 snappy_cuda.o: snappy_cuda.cu snappy_cuda.h
@@ -42,10 +44,13 @@ snappy_decompress.o: snappy_decompress.cu snappy_decompress.h
 	$(CC) -c  $< $(CC_FLAGS)
 snappy_iofilter.o: snappy_iofilter.cu snappy_iofilter.h
 	$(CC) -c  $< $(CC_FLAGS) $(IOFILTER_CFLAGS)
+gds_interface.o: gds_interface.cu gds_interface.h
+	$(CC) -c  $< $(CC_FLAGS) $(IOFILTER_CFLAGS)
 
 install:
-	@install -v -d $(DESTDIR)/bin $(DESTDIR)/include/snappy-cuda
+	@install -v -d $(DESTDIR)/bin $(DESTDIR)/lib $(DESTDIR)/include/snappy-cuda
 	@install -v snappy_cuda $(DESTDIR)/bin
+	@install -v libudf_snappy_reader.so $(DESTDIR)/lib
 	@install -v *.h $(DESTDIR)/include/snappy-cuda
 	@if [ -e libsnappy_cuda_iofilter.so ]; then \
 		install -v -d $(DESTDIR)/hdf5/lib/plugin; \
@@ -53,4 +58,4 @@ install:
 	fi
 
 clean: 
-	rm -f snappy_cuda libsnappy_cuda_iofilter.so *.o
+	rm -f snappy_cuda libsnappy_cuda_iofilter.so libudf_snappy_reader.so *.o
