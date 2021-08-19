@@ -2,6 +2,6 @@
 #define _SNAPPY_IOFILTER_H
 
 /* HDF5 filter ID */
-#define SNAPPY_CUDA_FILTER_ID 31301
+#define SNAPPY_CUDA_FILTER_ID 32003
 
 #endif /* _SNAPPY_IOFILTER_H */
