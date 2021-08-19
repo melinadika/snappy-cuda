@@ -7,8 +7,13 @@ CC := $(CUDA_DIR)/bin/nvcc
 DESTDIR = /usr/local
 
 # Build flags
-CUDA_ARCH_FLAGS := -arch=sm_75
-#CC_FLAGS += $(CUDA_ARCH_FLAGS) -I. -g -G -Xptxas -dlcm=cg
+CUDA_ARCH_FLAGS := \
+       -arch=sm_60 \
+       -gencode=arch=compute_60,code=sm_60 \
+       -gencode=arch=compute_61,code=sm_61 \
+       -gencode=arch=compute_70,code=sm_70 \
+       -gencode=arch=compute_75,code=sm_75 \
+       -gencode=arch=compute_75,code=compute_75
 CC_FLAGS += $(CUDA_ARCH_FLAGS) -I. -O3 -Xcompiler -fPIC
 LD_FLAGS := -Xcompiler -fPIC -shared
 IOFILTER_CFLAGS := $(shell pkg-config --cflags hdf5)
@@ -25,7 +30,6 @@ iofilter: libsnappy_cuda_iofilter.so
 
 snappy_cuda : $(MAIN_OBJ)
 	$(CC) $^ $(CUDA_ARCH_FLAGS) -o $@
-	./gen_cscope.sh
 
 libsnappy_cuda_iofilter.so: $(IOFILTER_OBJ) $(LIB_OBJ)
 	$(CC) $^ $(CUDA_ARCH_FLAGS) $(IOFILTER_LDFLAGS) $(LD_FLAGS) -o $@
