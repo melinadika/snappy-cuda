@@ -417,7 +417,9 @@ snappy_status snappy_decompress_host(struct host_buffer_context *input, struct h
 
 snappy_status snappy_decompress_cuda(struct host_buffer_context *input, struct host_buffer_context *output, struct program_runtime *runtime)
 {
-	uint32_t total_blocks = 0;
+	int device = -1;
+	cudaGetDevice(&device);
+	cudaMemPrefetchAsync(input->buffer, input->total_size, device, NULL);
 
 	// Read the decompressed block size
 	uint32_t dblock_size;
@@ -427,7 +429,7 @@ snappy_status snappy_decompress_cuda(struct host_buffer_context *input, struct h
 	}
 
 	//total dblock_size (32K) output blocks
-	total_blocks = (output->length + dblock_size - 1) / dblock_size;
+	uint32_t total_blocks = (output->length + dblock_size - 1) / dblock_size;
 
 	//CUDA calculation for grid and threads per block
 	dim3 block(1);
@@ -490,11 +492,8 @@ snappy_status snappy_decompress_cuda(struct host_buffer_context *input, struct h
 		//printf("block %d compressred size = %d\n",i, compressed_size);
 	}
 
-	int device = -1;
-  	cudaGetDevice(&device);
 	cudaMemPrefetchAsync(input_currents,sizeof(uint8_t *) * total_blocks , device, NULL);
 	cudaMemPrefetchAsync(input_offsets,sizeof(uint32_t) * total_blocks , device, NULL);
-	cudaMemPrefetchAsync(input->buffer, input->total_size, device, NULL);
 
 	snappy_decompress_kernel<<<grid,block,0>>>(input, output, total_blocks, dblock_size, input_offsets, input_currents);
 	checkCudaErrors(cudaDeviceSynchronize());
