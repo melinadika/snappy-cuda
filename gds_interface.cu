@@ -23,9 +23,7 @@ struct gds_context {
     struct program_runtime runtime;
 };
 
-void *decompressor_init(
-    void *gpu_input_buf, size_t gpu_input_size, size_t gpu_total_input_size,
-    void *gpu_output_buf, size_t gpu_output_size)
+void *decompressor_alloc()
 {
     // Alloc buffers
     auto ctx = new struct gds_context;
@@ -35,22 +33,31 @@ void *decompressor_init(
     memset(ctx->output, 0, sizeof(host_buffer_context));
     memset(&ctx->runtime, 0, sizeof(struct program_runtime));
 
+    // Configure runtime
+    ctx->runtime.reuse_buffers = true;
+    ctx->runtime.using_cuda = true;
+
+    return (void *) ctx;
+}
+
+void decompressor_init(
+    void *gpu_input_buf, size_t gpu_input_size, size_t gpu_total_input_size,
+    void *gpu_output_buf, size_t gpu_output_size,
+    void *reader_ctx)
+{
+    struct gds_context *ctx = (struct gds_context *) reader_ctx;
+
     // Setup input
     ctx->input->max = ULONG_MAX;
     ctx->input->buffer = ctx->input->curr = (uint8_t *) gpu_input_buf;
     ctx->input->length = gpu_input_size;
     ctx->input->total_size = gpu_total_input_size;
-    
+
     // Setup output
     ctx->output->max = gpu_output_size;
     ctx->output->buffer = ctx->output->curr = (uint8_t *) gpu_output_buf;
 
-    // Configure runtime
-    ctx->runtime.reuse_buffers = true;
-    ctx->runtime.using_cuda = true;
-
     setup_decompression_cuda(ctx->input, ctx->output, &ctx->runtime);
-    return (void *) ctx;
 }
 
 void decompressor_destroy(void *reader_ctx)
