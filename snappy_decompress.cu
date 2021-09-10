@@ -513,7 +513,7 @@ snappy_status snappy_decompress_cuda(struct host_buffer_context *input, struct h
 	cudaMemPrefetchAsync(input_offsets,sizeof(uint32_t) * total_blocks , device, NULL);
 
 	snappy_decompress_kernel<<<grid,block,0>>>(input, output, total_blocks, dblock_size, input_offsets, input_currents);
-	checkCudaErrors(cudaDeviceSynchronize());
+	checkCudaErrors(cudaStreamSynchronize(0));
 
 	return SNAPPY_OK;
 }	

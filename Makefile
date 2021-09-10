@@ -14,7 +14,7 @@ CUDA_ARCH_FLAGS := \
     -gencode=arch=compute_70,code=sm_70 \
     -gencode=arch=compute_75,code=sm_75 \
     -gencode=arch=compute_75,code=compute_75
-CC_FLAGS += $(CUDA_ARCH_FLAGS) -I. -O3 -Xcompiler -fPIC
+CC_FLAGS += $(CUDA_ARCH_FLAGS) -I. -O3 -Xcompiler -fPIC --default-stream per-thread
 LD_FLAGS := -Xcompiler -fPIC -shared
 IOFILTER_CFLAGS := $(shell pkg-config --cflags hdf5)
 IOFILTER_LDFLAGS := $(shell pkg-config --libs hdf5)
