@@ -20,8 +20,16 @@ __host__ __device__ static inline bool read_varint32(struct host_buffer_context 
 	int shift = 0;
 	*val = 0;
 
+#ifdef __CUDA_ARCH__
+	uint8_t *curr = input->curr;
+#else
+	uint8_t host_buf[5], *curr = host_buf;
+	cudaMemcpy(host_buf, input->curr, sizeof(host_buf), cudaMemcpyDeviceToHost);
+#endif
+
 	for (uint8_t count = 0; count < 5; count++) {
-		int8_t c = (int8_t)(*input->curr++);
+		int8_t c = (int8_t)(*curr++);
+		input->curr++;
 		*val |= (c & BITMASK(7)) << shift;
 		if (!(c & (1 << 7)))
 			return true;
@@ -41,8 +49,17 @@ __host__ __device__ static inline bool read_varint32(struct host_buffer_context 
 __host__ __device__ static uint32_t read_uint32(struct host_buffer_context *input)
 {
 	uint32_t val = 0;
+
+#ifdef __CUDA_ARCH__
+	uint8_t *curr = input->curr;
+#else
+	uint8_t host_buf[sizeof(uint32_t)], *curr = host_buf;
+	cudaMemcpy(host_buf, input->curr, sizeof(host_buf), cudaMemcpyDeviceToHost);
+#endif
+
 	for (uint8_t i = 0; i < sizeof(uint32_t); i++) {
-		val |= (*input->curr++) << (8 * i);
+		input->curr++;
+		val |= (*curr++) << (8 * i);
 	}
 
 	return val;
