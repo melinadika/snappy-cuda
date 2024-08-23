@@ -308,14 +308,29 @@ int main(int argc, char **argv)
 			write_output_host(output_file, output);
 
 		if (compress) {
+	
 			printf("Compressed %ld bytes to: %s\n", output->length, output_file);
 			printf("Compression ratio: %f\n", 1 - (double)output->length / (double)input->length);
+			
+			struct timeval start;
+			struct timeval end;
+			gettimeofday(&start, NULL);
 			terminate_compression(input, output, &runtime);
+			gettimeofday(&end, NULL);
+
+			runtime.d_free = get_runtime(&start, &end);
 		}
 		else {
 			printf("Decompressed %ld bytes to: %s\n", output->length, output_file);
 			printf("Compression ratio: %f\n", 1 - (double)input->length / (double)output->length);
+	
+			struct timeval start;
+			struct timeval end;
+			gettimeofday(&start, NULL);
 			terminate_decompression(input, output, &runtime);
+			gettimeofday(&end, NULL);
+
+			runtime.d_free = get_runtime(&start, &end);
 		}
 	
 		printf("Pre-processing time: %f\n", runtime.pre);
