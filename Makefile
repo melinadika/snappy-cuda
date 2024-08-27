@@ -26,7 +26,7 @@ IOFILTER_OBJ = snappy_iofilter.o
 LIBUDF_READER_OBJ = gds_interface.o
 
 # Main targets
-all: snappy_cuda libsnappy_cuda_iofilter.so libudf_snappy_reader.so decompress_measure
+all: decompress_measure snappy_cuda libsnappy_cuda_iofilter.so libudf_snappy_reader.so 
 
 decompress_measure: $(DEC_OBJ)
 	$(CC) $^ $(CUDA_ARCH_FLAGS) -o $@

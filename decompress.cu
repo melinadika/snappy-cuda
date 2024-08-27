@@ -22,44 +22,6 @@
  * @return 1 if file does not exist, is too long, or different number of bytes
  *         were read than expected, 0 otherwise
  */
-static int read_input_host(char *in_file, struct host_buffer_context *input)
-{
-	FILE *fin = fopen(in_file, "r");
-	if (fin == NULL) {
-		fprintf(stderr, "Invalid input file: %s\n", in_file);
-		return 1;
-	}
-
-	fseek(fin, 0, SEEK_END);
-	input->length = ftell(fin);
-	fseek(fin, 0, SEEK_SET);
-
-	if (input->length > input->max) {
-		fprintf(stderr, "input_size is too big (%ld > %ld)\n",
-				input->length, input->max);
-		return 1;
-	}
-
-	input->buffer = (uint8_t *)malloc(ALIGN_LONG(input->length, 8) * sizeof(*(input->buffer)));
-	input->curr = input->buffer;
-	size_t n = fread(input->buffer, sizeof(*(input->buffer)), input->length, fin);
-	fclose(fin);
-
-#ifdef DEBUG
-	printf("%s: read %ld bytes from %s (%lu)\n", __func__, input->length, in_file, n);
-#endif
-   return (n != input->length);
-}
-
-/**
- * Read the contents of a file into an in-memory buffer. Upon success,
- * writes the amount read to input->length.
- *
- * @param in_file: input file name.
- * @param input: holds input buffer information
- * @return 1 if file does not exist, is too long, or different number of bytes
- *         were read than expected, 0 otherwise
- */
 static int read_input_cuda(char *in_file, struct host_buffer_context *input)
 {
 	FILE *fin = fopen(in_file, "r");
@@ -97,12 +59,12 @@ static int read_input_cuda(char *in_file, struct host_buffer_context *input)
  * @param out_file: output filename.
  * @param output: holds output buffer information
  */
-static void write_output_host(char *out_file, struct host_buffer_context *output)
-{
-	FILE *fout = fopen(out_file, "w");
-	fwrite(output->buffer, 1, output->length, fout);
-	fclose(fout);
-}
+// static void write_output_host(char *out_file, struct host_buffer_context *output)
+// {
+// 	FILE *fout = fopen(out_file, "w");
+// 	fwrite(output->buffer, 1, output->length, fout);
+// 	fclose(fout);
+// }
 
 /**
  * Print out application usage.
@@ -136,14 +98,10 @@ double get_runtime(struct timeval *start, struct timeval *end) {
 
 int main(int argc, char **argv)
 {
-	int opt;
 	snappy_status status;
 	
-	int compress = 0;
 	int block_size = 32 * 1024; // Default is 32KB
     char * input_file = NULL;
-    char * output_file = NULL;
-    const char * default_output_file = "output.txt";
 	struct host_buffer_context *input;
 	struct host_buffer_context *output;
 	struct program_runtime runtime;
