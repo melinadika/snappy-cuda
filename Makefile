@@ -21,7 +21,7 @@ IOFILTER_LDFLAGS := $(shell pkg-config --libs hdf5)
 
 LIB_OBJ = snappy_compress.o snappy_decompress.o
 MAIN_OBJ = $(LIB_OBJ) snappy_cuda.o
-DEC_OBJ = $(LIB_OBJ) decompress_measure.o
+DEC_OBJ = $(LIB_OBJ) decompress.o
 IOFILTER_OBJ = snappy_iofilter.o
 LIBUDF_READER_OBJ = gds_interface.o
 
@@ -42,7 +42,7 @@ libudf_snappy_reader.so: $(LIBUDF_READER_OBJ) $(LIB_OBJ)
 
 snappy_cuda.o: snappy_cuda.cu snappy_cuda.h
 	$(CC) -c  $< $(CC_FLAGS)
-decompress_measure.o: decompress.cu snappy_cuda.h
+decompress.o: decompress.cu snappy_cuda.h snappy_compress.o snappy_decompress.o
 	$(CC) -c  $< $(CC_FLAGS)
 snappy_compress.o: snappy_compress.cu snappy_compress.h
 	$(CC) -c  $< $(CC_FLAGS)
