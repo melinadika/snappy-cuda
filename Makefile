@@ -36,7 +36,7 @@ libsnappy_cuda_iofilter.so: $(IOFILTER_OBJ) $(LIB_OBJ)
 libudf_snappy_reader.so: $(LIBUDF_READER_OBJ) $(LIB_OBJ)
 	$(CC) $^ $(CUDA_ARCH_FLAGS) $(IOFILTER_LDFLAGS) $(LD_FLAGS) -o $@
 
-snappy_cuda.o: snappy_cuda.cu snappy_cuda.h
+snappy_cuda.o: decompress.cu snappy_cuda.h
 	$(CC) -c  $< $(CC_FLAGS)
 snappy_compress.o: snappy_compress.cu snappy_compress.h
 	$(CC) -c  $< $(CC_FLAGS)
