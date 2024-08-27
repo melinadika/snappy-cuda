@@ -28,10 +28,10 @@ LIBUDF_READER_OBJ = gds_interface.o
 # Main targets
 all: decompress_measure snappy_cuda libsnappy_cuda_iofilter.so libudf_snappy_reader.so 
 
-decompress_measure: $(DEC_OBJ)
+snappy_cuda : $(MAIN_OBJ)
 	$(CC) $^ $(CUDA_ARCH_FLAGS) -o $@
 
-snappy_cuda : $(MAIN_OBJ)
+decompress_measure: $(DEC_OBJ)
 	$(CC) $^ $(CUDA_ARCH_FLAGS) -o $@
 
 libsnappy_cuda_iofilter.so: $(IOFILTER_OBJ) $(LIB_OBJ)
@@ -56,6 +56,7 @@ gds_interface.o: gds_interface.cu gds_interface.h
 install:
 	@install -v -d $(DESTDIR)/bin $(DESTDIR)/lib $(DESTDIR)/include/snappy-cuda
 	@install -v snappy_cuda $(DESTDIR)/bin
+	@install -v decompress_measure $(DESTDIR)/bin
 	@install -v libudf_snappy_reader.so $(DESTDIR)/lib
 	@install -v *.h $(DESTDIR)/include/snappy-cuda
 	@if [ -e libsnappy_cuda_iofilter.so ]; then \
@@ -64,4 +65,4 @@ install:
 	fi
 
 clean: 
-	rm -f snappy_cuda libsnappy_cuda_iofilter.so libudf_snappy_reader.so *.o
+	rm -f decompress_measure snappy_cuda libsnappy_cuda_iofilter.so libudf_snappy_reader.so *.o
