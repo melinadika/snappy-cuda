@@ -98,6 +98,9 @@ double get_runtime(struct timeval *start, struct timeval *end) {
 
 int main(int argc, char **argv)
 {
+	struct timeval start;
+	gettimeofday(&start, NULL);
+	printf("%.4f", start.tv_sec + start.tv_usec / 1000000.0);
 	snappy_status status;
 	
 	int block_size = 32 * 1024; // Default is 32KB
