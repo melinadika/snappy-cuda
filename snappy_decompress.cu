@@ -198,9 +198,13 @@ __host__ __device__ static bool write_copy_host(struct host_buffer_context *outp
 
 __global__ void snappy_decompress_kernel(struct host_buffer_context *input, struct host_buffer_context *output, uint32_t total_blocks, uint32_t dblock_size, uint32_t *input_offsets, uint8_t **input_currents)
 {
-	uint32_t idx = blockDim.x * blockIdx.x + threadIdx.x;
+	input_d.buffer = input->buffer;
 }
+__global__ void snappy_decompress_kernel_fake(struct host_buffer_context *input, struct host_buffer_context *output, uint32_t total_blocks, uint32_t dblock_size, uint32_t *input_offsets, uint8_t **input_currents)
+{
+	uint32_t idx = blockDim.x * blockIdx.x + threadIdx.x;
 
+}
 snappy_status setup_decompression(struct host_buffer_context *input, struct host_buffer_context *output, struct program_runtime *runtime)
 {
 	struct timeval start;
