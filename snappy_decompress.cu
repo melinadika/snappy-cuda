@@ -198,14 +198,36 @@ __host__ __device__ static bool write_copy_host(struct host_buffer_context *outp
 
 __global__ void snappy_decompress_kernel(struct host_buffer_context *input, struct host_buffer_context *output, uint32_t total_blocks, uint32_t dblock_size, uint32_t *input_offsets, uint8_t **input_currents)
 {
-	host_buffer_context input_d, output_d;
-	input_d.buffer = input->buffer;
-}
-__global__ void snappy_decompress_kernel_fake(struct host_buffer_context *input, struct host_buffer_context *output, uint32_t total_blocks, uint32_t dblock_size, uint32_t *input_offsets, uint8_t **input_currents)
-{
 	uint32_t idx = blockDim.x * blockIdx.x + threadIdx.x;
 
+	host_buffer_context input_d, output_d;
+	input_d.buffer = input->buffer;
+	input_d.length = input->length;
+	input_d.curr = input_currents[idx];
+
+	output_d.buffer = output->buffer;
+	output_d.length = output->length;
+	output_d.curr = output->curr + (idx * dblock_size);
+
+	if(idx < total_blocks)
+	{
+		uint8_t *block_end = input_d.curr + input_offsets[idx];
+	
+		while (input_d.curr != block_end) {	
+			uint16_t length;
+			uint32_t offset;
+			const uint8_t tag = *input_d.curr++;
+			//printf("Got tag byte 0x%x at index 0x%lx\n", tag, input->curr - input->buffer - 1);
+
+			/* There are two types of elements in a Snappy stream: Literals and
+			copies (backreferences). Each element starts with a tag byte,
+			and the lower two bits of this tag byte signal what type of element
+			will follow. */
+			
+		}
+	}
 }
+
 snappy_status setup_decompression(struct host_buffer_context *input, struct host_buffer_context *output, struct program_runtime *runtime)
 {
 	struct timeval start;
