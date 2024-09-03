@@ -199,81 +199,8 @@ __host__ __device__ static bool write_copy_host(struct host_buffer_context *outp
 __global__ void snappy_decompress_kernel(struct host_buffer_context *input, struct host_buffer_context *output, uint32_t total_blocks, uint32_t dblock_size, uint32_t *input_offsets, uint8_t **input_currents)
 {
 	uint32_t idx = blockDim.x * blockIdx.x + threadIdx.x;
-
-	host_buffer_context input_d, output_d;
-	input_d.buffer = input->buffer;
-	input_d.length = input->length;
-	input_d.curr = input_currents[idx];
-
-	output_d.buffer = output->buffer;
-	output_d.length = output->length;
-	output_d.curr = output->curr + (idx * dblock_size);
-
-	if(idx < total_blocks)
-	{
-		uint8_t *block_end = input_d.curr + input_offsets[idx];
-	
-		while (input_d.curr != block_end) {	
-			uint16_t length;
-			uint32_t offset;
-			const uint8_t tag = *input_d.curr++;
-			//printf("Got tag byte 0x%x at index 0x%lx\n", tag, input->curr - input->buffer - 1);
-
-			/* There are two types of elements in a Snappy stream: Literals and
-			copies (backreferences). Each element starts with a tag byte,
-			and the lower two bits of this tag byte signal what type of element
-			will follow. */
-			switch (GET_ELEMENT_TYPE(tag))
-			{
-			case EL_TYPE_LITERAL:
-				/* For literals up to and including 60 bytes in length, the upper
-				 * six bits of the tag byte contain (len-1). The literal follows
-				 * immediately thereafter in the bytestream.
-				 */
-				length = GET_LENGTH_2_BYTE(tag) + 1;
-				if (length > 60)
-				{
-					length = read_long_literal_size(&input_d, length - 60) + 1;
-				}
-
-				writer_append_host(&input_d, &output_d, length);
-				break;
-
-			/* Copies are references back into previous decompressed data, telling
-			 * the decompressor to reuse data it has previously decoded.
-			 * They encode two values: The _offset_, saying how many bytes back
-			 * from the current position to read, and the _length_, how many bytes
-			 * to copy.
-			 */
-			case EL_TYPE_COPY_1:
-				length = GET_LENGTH_1_BYTE(tag) + 4;
-				offset = make_offset_1_byte(tag, &input_d);
-				if (!write_copy_host(&output_d, length, offset))
-					return;
-				break;
-
-			case EL_TYPE_COPY_2:
-				length = GET_LENGTH_2_BYTE(tag) + 1;
-				offset = make_offset_2_byte(tag, &input_d);
-				if (!write_copy_host(&output_d, length, offset))
-					return;
-				break;
-
-			case EL_TYPE_COPY_4:
-				length = GET_LENGTH_2_BYTE(tag) + 1;
-				offset = make_offset_4_byte(tag, &input_d);
-				if (!write_copy_host(&output_d, length, offset))
-					return;
-				break;
-			}
-		}
-	}
 }
-__global__ void snappy_decompress_kernel_fake(struct host_buffer_context *input, struct host_buffer_context *output, uint32_t total_blocks, uint32_t dblock_size, uint32_t *input_offsets, uint8_t **input_currents)
-{
-	uint32_t idx = blockDim.x * blockIdx.x + threadIdx.x;
 
-}
 snappy_status setup_decompression(struct host_buffer_context *input, struct host_buffer_context *output, struct program_runtime *runtime)
 {
 	struct timeval start;
