@@ -517,10 +517,10 @@ snappy_status snappy_decompress_cuda(struct host_buffer_context *input, struct h
 	cudaMemPrefetchAsync(input_offsets,sizeof(uint32_t) * total_blocks , device, NULL);
 	struct timeval start;
 	gettimeofday(&start, NULL);
-	printf("%.4f", start.tv_sec + start.tv_usec / 1000000.0);
-	snappy_decompress_kernel_fake<<<grid,block,0>>>(input, output, total_blocks, dblock_size, input_offsets, input_currents);
+	printf("GPU start: %.4f", start.tv_sec + start.tv_usec / 1000000.0);
+	snappy_decompress_kernel<<<grid,block,0>>>(input, output, total_blocks, dblock_size, input_offsets, input_currents);
 	gettimeofday(&start, NULL);
-	printf("%.4f", start.tv_sec + start.tv_usec / 1000000.0);
+	printf("GPU end: %.4f", start.tv_sec + start.tv_usec / 1000000.0);
 	checkCudaErrors(cudaStreamSynchronize(0));
 
 	return SNAPPY_OK;
