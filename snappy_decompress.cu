@@ -269,7 +269,7 @@ __global__ void snappy_decompress_kernel(struct host_buffer_context *input, stru
 		}
 	}
 }
-}
+
 snappy_status setup_decompression(struct host_buffer_context *input, struct host_buffer_context *output, struct program_runtime *runtime)
 {
 	struct timeval start;
