@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 {
 	struct timeval start;
 	gettimeofday(&start, NULL);
-	printf("%.4f", start.tv_sec + start.tv_usec / 1000000.0);
+	printf(":start:%.4f", start.tv_sec + start.tv_usec / 1000000.0);
 	snappy_status status;
 	
 	int block_size = 32 * 1024; // Default is 32KB
@@ -137,17 +137,21 @@ int main(int argc, char **argv)
 		return -1;
 	input->block_size = block_size;
 	
-
+	gettimeofday(&start, NULL);
+	printf(":setup:%.4f", start.tv_sec + start.tv_usec / 1000000.0);
 	if (setup_decompression_cuda(input, output, &runtime))
 		return -1;
 
 
+	gettimeofday(&start, NULL);
+	printf(":decompress:%.4f", start.tv_sec + start.tv_usec / 1000000.0);
 	status = snappy_decompress_cuda(input, output, &runtime);
 	
 	
 	if (status == SNAPPY_OK)
 	{
-
+		gettimeofday(&start, NULL);
+		printf(":cleanup:%.4f", start.tv_sec + start.tv_usec / 1000000.0);
 		terminate_decompression(input, output, &runtime);
 			
 	}
