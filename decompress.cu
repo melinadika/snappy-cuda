@@ -148,11 +148,11 @@ int main(int argc, char **argv)
 	status = snappy_decompress_cuda(input, output, &runtime);
 	
 	
-	printf("%d, %d",status, SNAPPY_OK);
+	fprintf(stderr, "%d, %d",status, SNAPPY_OK);
 	if (status == SNAPPY_OK)
 	{
 		gettimeofday(&start, NULL);
-		printf(":cleanup:%.4f", start.tv_sec + start.tv_usec / 1000000.0);
+		fprintf(stderr,":cleanup:%.4f", start.tv_sec + start.tv_usec / 1000000.0);
 		terminate_decompression(input, output, &runtime);
 			
 	}
