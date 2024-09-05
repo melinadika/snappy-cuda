@@ -518,6 +518,5 @@ snappy_status snappy_decompress_cuda(struct host_buffer_context *input, struct h
 	gettimeofday(&start, NULL);
 	printf(":after GPU:%.4f", start.tv_sec + start.tv_usec / 1000000.0);
 	checkCudaErrors(cudaStreamSynchronize(0));
-	printf("returning");
 	return SNAPPY_OK;
 }	
